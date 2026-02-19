@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { orgMember } from './schema/org-member.schema';
-import { Model } from 'mongoose';
+import { ClientSession, Model } from 'mongoose';
 import { OrgMemberSchema } from './org-members.dto';
 
 @Injectable()
@@ -10,8 +10,8 @@ export class OrgMembersService {
     @InjectModel(orgMember.name) private orgMemberModel: Model<orgMember>,
   ) {}
 
-  async createOrgMember(orgMemberDto : OrgMemberSchema) {
+  async createOrgMember(orgMemberDto : OrgMemberSchema, options? : {session? : ClientSession}) {
     const member = new this.orgMemberModel(orgMemberDto);
-    return await member.save()
+    return await member.save({session : options?.session})
   }
 }

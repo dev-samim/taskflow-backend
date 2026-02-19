@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { HttpException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { CreateUserDto } from './auth.dto';
 import { UsersService } from 'src/users/users.service';
@@ -21,24 +21,39 @@ export class AuthService {
     session.startTransaction();
     try {
       // create User
-      const user = await this.userService.createUser(createUserDto);
+      const user = await this.userService.createUser(createUserDto, {session});
 
       //create org
       const org = await this.orgService.createOrganization({
-        name: 'test', //change needed
-      });
+        name: user.username
+      }, {session});
 
       //create org member
       const orgMember = await this.orgMemberService.createOrgMember({
         user: user.id,
         role: 'ADMIN',
         status: 'ACTIVE',
-        org: 'shhs', //change need
-      });
+        org: org.id
+      }, {session});
 
       session.commitTransaction();
+
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        org: {
+          id: org.id,
+          name: org.name,
+          slug: org.slug,
+        },
+      };
     } catch (error) {
+      console.log(error);
       session.abortTransaction();
+      if (error instanceof HttpException){
+        throw error
+      }
       throw new InternalServerErrorException(
         'Failed to create user and organization',
       );

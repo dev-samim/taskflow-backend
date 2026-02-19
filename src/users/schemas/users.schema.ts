@@ -8,6 +8,9 @@ export class User {
   @Prop({ required: true, unique: true, index: true })
   email: string;
 
+  @Prop({required : true})
+  username :string
+
   @Prop({ required: true })
   password: string;
 
