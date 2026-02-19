@@ -1,16 +1,17 @@
 # 📊 TaskFlow – Database Schema Documentation
 
-This document explains the **MongoDB data model** used in **TaskFlow**, including collection structure, relationships, and design decisions. The schema is designed for **scalability, multi-tenancy, and advanced authorization**.
+This document explains the **MongoDB data model** used in **TaskFlow**, including collection structure, relationships, and key design decisions. The schema is intentionally designed for **scalable multi-tenancy, clean RBAC, and auditability**, following real-world SaaS patterns.
 
 ---
 
 ## 🧠 Design Principles
 
-* **Multi-tenant by design** (organization-scoped data)
+* **True multi-tenancy** (organization-scoped data, shared users)
+* **Separation of concerns** (identity vs membership vs authorization)
 * **RBAC-first** authorization model
 * **Auditability** for security & compliance
 * **Scalable querying** with proper indexing
-* **Soft extensibility** for future features
+* **Future-proof extensibility** (invites, multi-org users, enterprise plans)
 
 ---
 
@@ -26,6 +27,7 @@ Represents a tenant (company / team) using TaskFlow.
 Organization {
   _id: ObjectId
   name: string
+  slug: string            // unique, URL-safe identifier
   plan: 'free' | 'pro' | 'enterprise'
   isActive: boolean
   createdAt: Date
@@ -34,26 +36,25 @@ Organization {
 
 ### Notes
 
-* Acts as the **root entity** for multi-tenancy
-* All major entities are scoped by `orgId`
+* Root entity for multi-tenancy
+* All business data is scoped via `orgId`
+* `slug` is generated on the backend and used for routing
 
 ---
 
-## 👤 Users Collection
+## 👤 Users Collection (Global Identity)
 
 ### Purpose
 
-Stores user identity, authentication, and organization mapping.
+Stores **user identity and authentication data only**. Users are **not directly tied to organizations or roles**.
 
 ### Schema
 
 ```ts
 User {
   _id: ObjectId
-  email: string            // unique per organization
+  email: string            // globally unique
   password: string         // hashed
-  orgId: ObjectId          // Organization reference
-  roleId: ObjectId         // Role reference
   isActive: boolean
   lastLogin: Date
   createdAt: Date
@@ -63,8 +64,43 @@ User {
 ### Indexes
 
 * `email` (unique)
+
+### Notes
+
+* A single user can belong to **multiple organizations**
+* Authorization is handled via organization membership
+
+---
+
+## 🧩 OrganizationMembers Collection
+
+### Purpose
+
+Acts as the **link between users, organizations, and roles**. This collection enables true multi-tenancy and per-organization RBAC.
+
+### Schema
+
+```ts
+OrganizationMember {
+  _id: ObjectId
+  userId: ObjectId         // User reference
+  orgId: ObjectId          // Organization reference
+  roleId: ObjectId         // Role reference
+  status: 'INVITED' | 'ACTIVE' | 'REMOVED'
+  joinedAt: Date
+}
+```
+
+### Indexes
+
+* `userId + orgId` (unique)
 * `orgId`
 * `roleId`
+
+### Notes
+
+* A user can have **different roles in different organizations**
+* Enables org invites, role changes, and membership lifecycle
 
 ---
 
@@ -72,23 +108,23 @@ User {
 
 ### Purpose
 
-Defines roles and permissions for **advanced RBAC**.
+Defines roles and permissions for **role-based access control (RBAC)**. Roles are **organization-scoped**.
 
 ### Schema
 
 ```ts
 Role {
   _id: ObjectId
-  name: string             // ADMIN, MANAGER, USER, CUSTOM
-  permissions: string[]    // e.g. CREATE_TASK, DELETE_USER
+  name: string             // OWNER, ADMIN, MEMBER, CUSTOM
+  permissions: string[]    // e.g. task:create, member:invite
   orgId: ObjectId
 }
 ```
 
 ### Notes
 
-* Roles are **organization-scoped**
-* Enables custom roles per tenant
+* Each organization can define custom roles
+* Default roles are auto-created during organization setup
 
 ---
 
@@ -96,7 +132,7 @@ Role {
 
 ### Purpose
 
-Core business entity representing work items.
+Core business entity representing work items within an organization.
 
 ### Schema
 
@@ -108,7 +144,7 @@ Task {
   status: 'todo' | 'in-progress' | 'done'
   priority: 'low' | 'medium' | 'high'
   assignedTo: ObjectId     // User reference
-  createdBy: ObjectId     // User reference
+  createdBy: ObjectId      // User reference
   orgId: ObjectId
   dueDate: Date
   createdAt: Date
@@ -128,7 +164,7 @@ Task {
 
 ### Purpose
 
-Tracks important actions for **auditing and observability**.
+Tracks important system actions for **auditing, security, and observability**.
 
 ### Schema
 
@@ -136,7 +172,7 @@ Tracks important actions for **auditing and observability**.
 ActivityLog {
   _id: ObjectId
   action: string           // TASK_CREATED, LOGIN, ROLE_CHANGED
-  entityType: 'TASK' | 'USER'
+  entityType: 'TASK' | 'USER' | 'ORG'
   entityId: ObjectId
   performedBy: ObjectId    // User reference
   orgId: ObjectId
@@ -146,9 +182,9 @@ ActivityLog {
 
 ### Use Cases
 
-* Security auditing
-* Debugging
-* Admin dashboards
+* Security audits
+* Debugging & traceability
+* Admin activity timelines
 
 ---
 
@@ -156,7 +192,7 @@ ActivityLog {
 
 ### Purpose
 
-Secure session and refresh-token management.
+Manages refresh tokens for secure session handling and token rotation.
 
 ### Schema
 
@@ -172,19 +208,21 @@ RefreshToken {
 
 ### Notes
 
-* Works alongside **Redis token blacklist**
-* Enables refresh token rotation
+* Works alongside Redis token blacklist
+* Supports logout and refresh token rotation
 
 ---
 
 ## 🔗 Relationships Summary
 
 ```txt
-Organization 1 ──▶ Users
+Organization 1 ──▶ OrganizationMembers
 Organization 1 ──▶ Roles
 Organization 1 ──▶ Tasks
 
-Role 1 ──▶ Users
+User 1 ──▶ OrganizationMembers
+Role 1 ──▶ OrganizationMembers
+
 User 1 ──▶ Tasks
 User 1 ──▶ ActivityLogs
 User 1 ──▶ RefreshTokens
@@ -194,18 +232,9 @@ User 1 ──▶ RefreshTokens
 
 ## 🚀 Scalability Considerations
 
-* Organization-based partitioning
-* Index-driven queries
-* Cursor-based pagination
-* Async writes via queues (for logs & notifications)
+* Organization-based data isolation
+* Proper compound indexing
+* Cursor-based pagination for large datasets
+* Async writes via queues for logs & notifications
 
 ---
-
-## 📌 Notes for Interview Discussion
-
-You can confidently say:
-
-> "The schema is designed around multi-tenancy and RBAC, with audit logging and token security built in from day one. It supports scale, security, and future extensibility."
-
----
-
