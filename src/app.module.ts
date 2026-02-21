@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { OrgMembersModule } from './org-members/org-members.module';
 import { WinstonModule } from 'nest-winston';
 import { winstonOptions } from './logger/logger.config';
+import { RefreshTokenModule } from './refresh-token/refresh-token.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { winstonOptions } from './logger/logger.config';
     OrganizationsModule,
     UsersModule,
     AuthModule,
-    OrgMembersModule
+    OrgMembersModule,
+    RefreshTokenModule
   ],
   controllers: [AppController],
   providers: [AppService],

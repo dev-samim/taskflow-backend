@@ -1,17 +1,19 @@
 import {
   Body,
   Controller,
-  Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Post,
+  Req,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto, LoginUserDto } from './auth.dto';
 import type { Response } from 'express';
+import { AuthGuard } from 'src/common/guard/auth-guard/auth.guard';
+import { RefreshTokenGuard } from 'src/common/guard/refresh-token/refresh-token.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -42,7 +44,7 @@ export class AuthController {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
       })
-      .cookie('refreshToken', user.refreshToken, {
+      .cookie('refreshToken', user.refreshTokenJwt, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
@@ -55,5 +57,17 @@ export class AuthController {
         accessToken: user.accessToken,
       },
     };
+  }
+
+  @UseGuards(RefreshTokenGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post("logout")
+  async logout(@Req() req, @Res({passthrough : true}) res : Response){
+    if(!req.refreshToken){
+      res.clearCookie("accessToken").clearCookie("refreshToken")
+      return
+    }
+    await this.authService.logout(req.refreshToken.sub,req.refreshToken.jti)
+    res.clearCookie("accessToken").clearCookie("refreshToken")
   }
 }

@@ -6,9 +6,10 @@ import { HashService } from './hash.service';
 import { UsersModule } from 'src/users/users.module';
 import { OrgMembersModule } from 'src/org-members/org-members.module';
 import { OrganizationsModule } from 'src/organizations/organizations.module';
+import { RefreshTokenModule } from 'src/refresh-token/refresh-token.module';
 
 @Module({
-  imports : [UsersModule,OrganizationsModule,OrgMembersModule],
+  imports : [UsersModule,OrganizationsModule,OrgMembersModule,RefreshTokenModule],
   controllers: [AuthController],
   providers: [AuthService, JwtService, HashService]
 })
