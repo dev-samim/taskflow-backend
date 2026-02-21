@@ -2,9 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalFilter } from './common/filters/global/global.filter';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { winstonOptions } from './logger/logger.config';
+import { WinstonModule } from 'nest-winston';
+
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: WinstonModule.createLogger(winstonOptions),
+  });
   app.setGlobalPrefix("/api/v1")
   // app.enableVersioning({
   //   type: VersioningType.URI,
