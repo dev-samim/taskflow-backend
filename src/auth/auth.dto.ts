@@ -15,3 +15,11 @@ export class CreateUserDto {
   @IsOptional()
   isActive: boolean;
 }
+
+export class LoginUserDto{
+  @IsEmail()
+  email : string
+
+  @IsString()
+  password : string
+}

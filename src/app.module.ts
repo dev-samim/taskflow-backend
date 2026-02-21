@@ -7,9 +7,12 @@ import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { OrgMembersModule } from './org-members/org-members.module';
+import { WinstonModule } from 'nest-winston';
+import { winstonOptions } from './logger/logger.config';
 
 @Module({
   imports: [
+     WinstonModule.forRoot(winstonOptions),
     ConfigModule.forRoot({
       isGlobal : true
     }),
