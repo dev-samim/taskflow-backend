@@ -1,17 +1,20 @@
 import {
   Body,
   Controller,
-  Get,
   HttpCode,
   HttpStatus,
-  Inject,
   Post,
+  Req,
   Res,
+  UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto, LoginUserDto } from './auth.dto';
 import type { Response } from 'express';
+import { AuthGuard } from 'src/common/guard/auth-guard/auth.guard';
+import { RefreshTokenGuard } from 'src/common/guard/refresh-token/refresh-token.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -42,7 +45,7 @@ export class AuthController {
         httpOnly: true,
         maxAge: 15 * 60 * 1000,
       })
-      .cookie('refreshToken', user.refreshToken, {
+      .cookie('refreshToken', user.refreshTokenJwt, {
         httpOnly: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
@@ -53,6 +56,51 @@ export class AuthController {
         email: user.user.email,
         username: user.user.username,
         accessToken: user.accessToken,
+      },
+    };
+  }
+
+  @UseGuards(RefreshTokenGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Post('logout')
+  async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
+    this.logger.log(`POST /auth/logout request received`);
+    if (!req.refreshToken) {
+      res.clearCookie('accessToken').clearCookie('refreshToken');
+      return;
+    }
+    await this.authService.logout(req.refreshToken.sub, req.refreshToken.jti);
+    res.clearCookie('accessToken').clearCookie('refreshToken');
+  }
+
+  @UseGuards(RefreshTokenGuard)
+  @HttpCode(HttpStatus.OK)
+  @Post('refresh-token')
+  async refreshAccessToken(
+    @Req() req,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.logger.log(`POST /auth/refresh-token request received`);
+    if (!req.refreshToken) {
+      throw new UnauthorizedException('invalid refresh token');
+    }
+    const tokenData = await this.authService.refreshAccessToken(
+      req.refreshToken.sub,
+      req.refreshToken.jti,
+    );
+    res
+      .cookie('accessToken', tokenData.accessToken, {
+        httpOnly: true,
+        maxAge: 15 * 60 * 1000,
+      })
+      .cookie('refreshToken', tokenData.refreshTokenJwt, {
+        httpOnly: true,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+      });
+    return {
+      statusCode: HttpStatus.OK,
+      data: {
+        accessToken: tokenData.accessToken,
       },
     };
   }

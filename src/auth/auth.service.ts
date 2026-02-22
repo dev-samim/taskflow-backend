@@ -1,6 +1,5 @@
 import {
   HttpException,
-  Inject,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -13,7 +12,9 @@ import { OrgMembersService } from 'src/org-members/org-members.service';
 import { Connection } from 'mongoose';
 import { JwtService } from './jwt.service';
 import { HashService } from './hash.service';
-import  { Logger } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
+import uuid from 'uuid';
+import { RefreshTokenService } from 'src/refresh-token/refresh-token.service';
 
 @Injectable()
 export class AuthService {
@@ -23,6 +24,7 @@ export class AuthService {
     private orgMemberService: OrgMembersService,
     private hashService: HashService,
     private jwtService: JwtService,
+    private refreshTokenService: RefreshTokenService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
   private readonly logger = new Logger(AuthService.name);
@@ -61,7 +63,9 @@ export class AuthService {
         },
         { session },
       );
-      this.logger.log(`OrgMember created successfully | orgMemberId=${orgMember.id}`);
+      this.logger.log(
+        `OrgMember created successfully | orgMemberId=${orgMember.id}`,
+      );
 
       session.commitTransaction();
 
@@ -87,6 +91,8 @@ export class AuthService {
   }
 
   async loginUser(loginUserDto: LoginUserDto) {
+    //verify user using email and password
+
     const user = await this.userService.findUserByEmail(loginUserDto.email);
 
     if (!user) {
@@ -102,23 +108,55 @@ export class AuthService {
       throw new UnauthorizedException('Username or Password is invalid');
     }
 
+    //generate access and refresh tokens
+
     const accessToken = this.jwtService.signAccessToken({
       id: user.id,
-      email: user.email,
-      username: user.username,
     });
 
-    const refreshToken = this.jwtService.signRefreshToken({
-      id: user.id,
-      email: user.email,
-      username: user.username,
+    const rawRefreshToken = uuid.v4();
+    const refreshToken = await this.refreshTokenService.createNewRefresh(
+      user.id,
+      rawRefreshToken,
+    );
+
+    const refreshTokenJwt = this.jwtService.signRefreshToken({
+      sub: user.id,
+      jti: refreshToken.id,
     });
-     this.logger.log("Generated new refresh token and access token & User login successful")
+    this.logger.log(
+      'Generated new refresh token and access token & User login successful',
+    );
 
     return {
       user,
       accessToken,
-      refreshToken,
+      refreshTokenJwt,
     };
+  }
+
+  async logout(id: string, tokenId: string) {
+    await this.refreshTokenService.revokeToken(id, tokenId);
+  }
+
+  async refreshAccessToken(id: string, tokenId) {
+    await this.refreshTokenService.revokeToken(id, tokenId);
+    const rawRefreshToken = uuid.v4();
+    const refreshToken = await this.refreshTokenService.createNewRefresh(
+      id,
+      rawRefreshToken,
+    );
+    const accessToken = this.jwtService.signAccessToken({
+      sub: id,
+    });
+
+    const refreshTokenJwt = this.jwtService.signRefreshToken({
+      sub: id,
+      jti: refreshToken.id,
+    });
+
+    this.logger.log('Generated new refresh token and access token');
+
+    return { accessToken, refreshTokenJwt };
   }
 }

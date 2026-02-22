@@ -1,20 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { GlobalFilter } from './common/filters/global/global.filter';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { winstonOptions } from './logger/logger.config';
 import { WinstonModule } from 'nest-winston';
+import cookieParser from 'cookie-parser';
 
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: WinstonModule.createLogger(winstonOptions),
   });
+  app.use(cookieParser())
   app.setGlobalPrefix("/api/v1")
-  // app.enableVersioning({
-  //   type: VersioningType.URI,
-  //   defaultVersion: '1',
-  // });
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
