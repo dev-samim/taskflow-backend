@@ -22,11 +22,7 @@ export class RefreshTokenService {
   }
   
   async revokeToken(id :string, tokenId : string){
-    const token = await this.refreshTokenModel.findById(tokenId)
-    if(!token){
-      return
-    }
-    token.isRevoked = true
-    await token.save()
+    const token = await this.refreshTokenModel.updateOne({_id : tokenId, user : id},{$set : {isRevoked : true}})
+    return
   }
 }
