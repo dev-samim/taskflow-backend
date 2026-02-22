@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import jwt from 'jsonwebtoken';
 @Injectable()
-export class JwtService {
+export class TokenService {
   constructor(private configService: ConfigService) {}
 
   signAccessToken(payload) {

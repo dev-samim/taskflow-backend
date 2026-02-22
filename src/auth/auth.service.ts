@@ -10,11 +10,11 @@ import { UsersService } from 'src/users/users.service';
 import { OrganizationsService } from 'src/organizations/organizations.service';
 import { OrgMembersService } from 'src/org-members/org-members.service';
 import { Connection } from 'mongoose';
-import { JwtService } from './jwt.service';
-import { HashService } from './hash.service';
+import { HashService } from '../common/hash/hash.service';
 import { Logger } from '@nestjs/common';
 import uuid from 'uuid';
 import { RefreshTokenService } from 'src/refresh-token/refresh-token.service';
+import { TokenService } from 'src/common/token/token.service';
 
 @Injectable()
 export class AuthService {
@@ -23,7 +23,7 @@ export class AuthService {
     private orgService: OrganizationsService,
     private orgMemberService: OrgMembersService,
     private hashService: HashService,
-    private jwtService: JwtService,
+    private tokenService: TokenService,
     private refreshTokenService: RefreshTokenService,
     @InjectConnection() private readonly connection: Connection,
   ) {}
@@ -110,7 +110,7 @@ export class AuthService {
 
     //generate access and refresh tokens
 
-    const accessToken = this.jwtService.signAccessToken({
+    const accessToken = this.tokenService.signAccessToken({
       id: user.id,
     });
 
@@ -120,7 +120,7 @@ export class AuthService {
       rawRefreshToken,
     );
 
-    const refreshTokenJwt = this.jwtService.signRefreshToken({
+    const refreshTokenJwt = this.tokenService.signRefreshToken({
       sub: user.id,
       jti: refreshToken.id,
     });
@@ -146,11 +146,11 @@ export class AuthService {
       id,
       rawRefreshToken,
     );
-    const accessToken = this.jwtService.signAccessToken({
+    const accessToken = this.tokenService.signAccessToken({
       sub: id,
     });
 
-    const refreshTokenJwt = this.jwtService.signRefreshToken({
+    const refreshTokenJwt = this.tokenService.signRefreshToken({
       sub: id,
       jti: refreshToken.id,
     });
